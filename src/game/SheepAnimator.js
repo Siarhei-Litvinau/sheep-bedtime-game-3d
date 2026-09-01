@@ -3,7 +3,10 @@ import { orientUpForward } from '../world/surface.js';
 
 const MAX_CHARGE = 1.4; // сек удержания, после которых заряд не растёт дальше
 const LAND_DURATION = 0.32;
-const WALK_DURATION = 1.3;
+// ↑ с 1.3 (раздел 2 ревизии: main.js раздвинул land→walkTo примерно в 2 раза) —
+// без этого овца проезжала бы удлинённый путь к амбару с той же длительностью,
+// то есть заметно быстрее, а должен читаться заметный отрезок пути, не рывок.
+const WALK_DURATION = 2.6;
 const YAWN_DURATION = 0.5;
 const FADE_DURATION = 0.6;
 const RESET_PAUSE = 0.4;
@@ -88,7 +91,10 @@ export class SheepAnimator {
     if (this.state !== 'charge') return;
     const chargeT = Math.min(this.holdTime / MAX_CHARGE, 1);
     this.jumpHeight = 0.9 + chargeT * 0.7;
-    this.jumpDuration = 0.65 + chargeT * 0.35;
+    // ↑ база и разброс с 0.65/0.35 (раздел 2 ревизии: start→land стал заметно
+    // длиннее) — сохраняет прежнюю горизонтальную скорость прыжка на новой
+    // дистанции, иначе овца пролетала бы её неестественно быстро.
+    this.jumpDuration = 0.85 + chargeT * 0.46;
     this.state = 'jump';
     this.t = 0;
     this.sparkleSpawned = false;

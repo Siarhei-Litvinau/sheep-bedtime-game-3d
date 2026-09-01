@@ -32,7 +32,7 @@ function startGame(sessionDurationMinutes) {
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x0e0b16);
-  scene.fog = new THREE.Fog(0x0e0b16, 25, 70);
+  scene.fog = new THREE.Fog(0x0e0b16, 30, 95); // ↑ было 25/70 — сцена раздвинута (раздел 2 ревизии)
 
   const camera = createCamera(window.innerWidth / window.innerHeight);
   const { sun, fill } = createLighting(scene);
@@ -47,7 +47,9 @@ function startGame(sessionDurationMinutes) {
 
   // Забор идёт поперёк экрана и пересекает границу день/ночь по центру —
   // овцы прыгают по диагонали со светлой стороны (x<0) в тёмную (x>0).
-  const fence = new Fence(surfacePoint, { z: 4, xFrom: -6.5, xTo: 6.5, spacing: 1.0 });
+  // Забор раздвинут шире (было ±6.5) под увеличенный радиус планеты
+  // (раздел 2 ревизии) — сцена в целом просторнее.
+  const fence = new Fence(surfacePoint, { z: 5, xFrom: -10, xTo: 10, spacing: 1.0 });
   fence.addTo(scene);
 
   // Число овец сессии (раздел 3) — окон в амбаре ровно столько же, по одному
@@ -55,8 +57,11 @@ function startGame(sessionDurationMinutes) {
   const sheepCount = sheepCountForSession(sessionDurationMinutes);
 
   // Амбар стоит глубже в тёмной половине (x>0), дверью к забору/овцам (раздел 5.5).
+  // Отодвинут заметно дальше от забора (было 5.0/-1.0) — раздел 2 ревизии:
+  // амбар не должен читаться крупным планом в общем виде, к нему должен
+  // быть заметный отрезок пути после прыжка.
   const barn = new Barn({ windowCount: sheepCount });
-  barn.placeOnSurface(surfacePoint, 5.0, -1.0, new THREE.Vector3(-1, 0, 1));
+  barn.placeOnSurface(surfacePoint, 10.5, -5.0, new THREE.Vector3(-1, 0, 1));
   barn.addTo(scene);
 
   // Звёзды, деревья, трава и фоновые облака (раздел 5.7–5.9, п.8) —
@@ -64,29 +69,33 @@ function startGame(sessionDurationMinutes) {
   // звёзд синхронизированы с текущей скоростью дыхательного цикла.
   const stars = new Stars().addTo(scene);
 
+  // Координаты раздвинуты (раздел 2 ревизии) под увеличенный радиус планеты
+  // и перенесённый дальше амбар — деревья тёмной стороны теперь тянутся
+  // вдоль более длинного пути овцы к амбару, а не толпятся у забора.
   const trees = [
-    { x: -5.6, z: 1.3, day: true, scale: 1.0 },
-    { x: -6.9, z: 5.8, day: true, scale: 1.1 },
-    { x: -4.0, z: 8.4, day: true, scale: 0.9 },
-    { x: -7.4, z: -1.6, day: true, scale: 1.0 },
-    { x: 7.2, z: 2.4, day: false, scale: 1.1 },
-    { x: 2.2, z: -3.8, day: false, scale: 0.95 },
-    { x: 7.6, z: -1.8, day: false, scale: 1.0 },
-    { x: 1.8, z: 6.2, day: false, scale: 1.0 },
+    { x: -8.1, z: 1.9, day: true, scale: 1.0 },
+    { x: -10.0, z: 8.4, day: true, scale: 1.1 },
+    { x: -5.8, z: 12.2, day: true, scale: 0.9 },
+    { x: -10.7, z: -2.3, day: true, scale: 1.0 },
+    { x: 10.4, z: 3.5, day: false, scale: 1.1 },
+    { x: 3.2, z: -5.5, day: false, scale: 0.95 },
+    { x: 11.5, z: -2.6, day: false, scale: 1.0 },
+    { x: 2.6, z: 9.0, day: false, scale: 1.0 },
   ];
   const grassTufts = [
-    ...generateGrassTufts(12, -7.5, -1, 1.5, 8, true),
-    ...generateGrassTufts(12, 1, 7.5, -3, 5, false),
+    ...generateGrassTufts(12, -10.5, -1.4, 2.1, 11.2, true),
+    ...generateGrassTufts(12, 1.5, 10.5, -4.5, 7, false),
   ];
   const vegetation = new Vegetation(surfacePoint, trees, grassTufts).addTo(scene);
 
+  // Слегка раздвинуты вслед за общим масштабом сцены (раздел 2 ревизии).
   const backgroundClouds = new BackgroundClouds([
-    { x: -6, y: 11, z: -6, spread: 1.1, scale: 1.3, day: true },
-    { x: 3, y: 13, z: -10, spread: 1.0, scale: 1.1, day: true },
-    { x: -3, y: 15, z: -14, spread: 1.3, scale: 1.5, day: true },
-    { x: 9, y: 12, z: -8, spread: 1.2, scale: 1.4, day: false },
-    { x: 14, y: 9, z: 2, spread: 1.0, scale: 1.1, day: false },
-    { x: 6, y: 16, z: -12, spread: 1.1, scale: 1.2, day: false },
+    { x: -8, y: 12, z: -8, spread: 1.1, scale: 1.3, day: true },
+    { x: 4, y: 14, z: -13, spread: 1.0, scale: 1.1, day: true },
+    { x: -4, y: 16, z: -18, spread: 1.3, scale: 1.5, day: true },
+    { x: 13, y: 13, z: -10, spread: 1.2, scale: 1.4, day: false },
+    { x: 19, y: 10, z: 3, spread: 1.0, scale: 1.1, day: false },
+    { x: 9, y: 17, z: -15, spread: 1.1, scale: 1.2, day: false },
   ]).addTo(scene);
 
   function generateGrassTufts(count, xMin, xMax, zMin, zMax, day) {
@@ -104,12 +113,13 @@ function startGame(sessionDurationMinutes) {
 
   // Три фоновых NPC (раздел 5.2–5.4, п.9) — опциональны, реагируют на тап,
   // без завязки на основной таймер сессии.
+  // Раздвинуты вслед за более длинным путём овцы к амбару (раздел 2 ревизии).
   const owl = new OwlFirefly();
-  owl.placeOnSurface(surfacePoint, 6.8, 1.9, new THREE.Vector3(0, 0, 1));
+  owl.placeOnSurface(surfacePoint, 9.5, 2.7, new THREE.Vector3(0, 0, 1));
   owl.addTo(scene);
 
   const cat = new Cat();
-  cat.placeOnSurface(surfacePoint, 3.0, -2.1, new THREE.Vector3(-0.3, 0, 1));
+  cat.placeOnSurface(surfacePoint, 5.0, -3.0, new THREE.Vector3(-0.3, 0, 1));
   cat.addTo(scene);
 
   const cloudNpc = new CloudNpc(new THREE.Vector3(2, 12, -9));
@@ -163,10 +173,13 @@ function startGame(sessionDurationMinutes) {
   // Точки маршрута овцы (раздел 4): ждёт на светлой стороне (x<0) перед
   // забором, приземляется сразу за ним на тёмной (x>0), затем сонно уходит
   // к двери амбара.
+  // Раздвинуты (раздел 2 ревизии): дистанция прыжка (start→land) и особенно
+  // путь после приземления (land→walkTo) заметно длиннее — амбар теперь
+  // далеко в глубине тёмной половины, а не сразу за забором.
   const waypoints = {
-    start: { x: -2.6, z: 5.4 },
-    land: { x: 1.4, z: 2.6 },
-    walkTo: { x: 4.2, z: -0.3 },
+    start: { x: -4.0, z: 7.0 },
+    land: { x: 2.4, z: 3.6 },
+    walkTo: { x: 8.5, z: -3.5 },
   };
 
   // Очередь овец у забора (раздел 3, п.11.6): активна всегда только первая,

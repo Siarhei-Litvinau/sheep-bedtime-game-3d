@@ -43,7 +43,9 @@ const fragmentShader = /* glsl */ `
  */
 export class Planet {
   constructor({
-    radius = 30,
+    radius = 46, // ↑ было 30 (camera-and-layout-revision.md, п.2) — крупнее планета,
+    // при пропорционально раздвинутой композиции (main.js) даёт более
+    // выраженный изгиб горизонта и ощущение простора, а не диорамы.
     widthSegments = 48,
     heightSegments = 32,
     dayColor = new THREE.Color(0xf2b98a),
