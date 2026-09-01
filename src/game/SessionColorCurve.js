@@ -26,10 +26,21 @@ const FILL_INTENSITY_END = 0.28;
 
 // Граница день/ночь медленно смещается по дуге планеты синхронно с
 // прогрессом сессии — лёгкий дрейф "солнца", а не полный оборот.
-const TERMINATOR_ANGLE_START = 0;
-const TERMINATOR_ANGLE_END = -0.3;
+// Ориентация зафиксирована (camera-and-layout-revision.md, раздел 1):
+// светлая половина — слева от камеры (x<0), тёмная — справа (x>0).
+// uDayDir = (cosθ, sinθ) — угол PI даёт (-1,0), т.е. день на x<0.
+const TERMINATOR_ANGLE_START = Math.PI;
+const TERMINATOR_ANGLE_END = Math.PI + 0.3;
 
-const SUN_BASE_DIR = new THREE.Vector3(14, 16, 6);
+// Положение "солнца" — независимый угол поворота вокруг Y для того же
+// базового вектора (уже отражённого по X, чтобы солнце висело над
+// светлой половиной): вращение здесь не обязано совпадать по знаку с
+// TERMINATOR_ANGLE выше, это разные параметризации (прямое direction
+// vs. поворот фиксированного вектора).
+const SUN_ANGLE_START = 0;
+const SUN_ANGLE_END = -0.3;
+
+const SUN_BASE_DIR = new THREE.Vector3(-14, 16, 6);
 
 /**
  * Обновляет яркость/насыщенность/цветовую температуру сцены и позицию
@@ -63,8 +74,10 @@ export class SessionColorCurve {
     this.scene.background.copy(this._sky);
     if (this.scene.fog) this.scene.fog.color.copy(this._sky);
 
-    // Позиция "солнца" следует за той же дугой, что и терминатор планеты.
-    this.sun.position.copy(SUN_BASE_DIR).applyAxisAngle(new THREE.Vector3(0, 1, 0), terminatorAngle);
+    // Позиция "солнца" следует за той же дугой смещения, что и терминатор
+    // планеты, но собственным углом (см. комментарий у SUN_ANGLE_* выше).
+    const sunAngle = THREE.MathUtils.lerp(SUN_ANGLE_START, SUN_ANGLE_END, p);
+    this.sun.position.copy(SUN_BASE_DIR).applyAxisAngle(new THREE.Vector3(0, 1, 0), sunAngle);
     this._sunColor.copy(SUN_COLOR_START).lerp(SUN_COLOR_END, p);
     this.sun.color.copy(this._sunColor);
     this.sun.intensity = THREE.MathUtils.lerp(SUN_INTENSITY_START, SUN_INTENSITY_END, p);

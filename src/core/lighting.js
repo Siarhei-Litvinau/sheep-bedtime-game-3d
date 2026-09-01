@@ -10,7 +10,7 @@ import * as THREE from 'three';
  */
 export function createLighting(scene) {
   const sun = new THREE.DirectionalLight(0xffd9a8, 1.2);
-  sun.position.set(14, 16, 6); // над тёплой (светлой, x>0) половиной планеты
+  sun.position.set(-14, 16, 6); // над тёплой (светлой, x<0) половиной планеты — раздел 1 ревизии: день слева
   sun.target.position.set(0, 0, 0);
   scene.add(sun);
   scene.add(sun.target);

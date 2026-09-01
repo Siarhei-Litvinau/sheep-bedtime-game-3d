@@ -38,14 +38,15 @@ function startGame(sessionDurationMinutes) {
   const { sun, fill } = createLighting(scene);
 
   const planet = new Planet().addTo(scene);
-  // Терминатор развёрнут вдоль линии обзора камеры: справа тёплая половина, слева — ночь.
+  // Ориентация зафиксирована (camera-and-layout-revision.md, раздел 1):
+  // слева тёплая (светлая) половина, справа — ночь. Забор по центру (x=0).
   // Точный угол на старте сессии задаёт SessionColorCurve ниже.
-  planet.setTerminatorAngle(0);
+  planet.setTerminatorAngle(Math.PI);
 
   const surfacePoint = createSurfaceSampler(planet);
 
   // Забор идёт поперёк экрана и пересекает границу день/ночь по центру —
-  // овцы прыгают по диагонали со светлой стороны (x>0) в тёмную (x<0).
+  // овцы прыгают по диагонали со светлой стороны (x<0) в тёмную (x>0).
   const fence = new Fence(surfacePoint, { z: 4, xFrom: -6.5, xTo: 6.5, spacing: 1.0 });
   fence.addTo(scene);
 
@@ -53,9 +54,9 @@ function startGame(sessionDurationMinutes) {
   // на каждую заснувшую овцу (раздел 5.5).
   const sheepCount = sheepCountForSession(sessionDurationMinutes);
 
-  // Амбар стоит глубже в тёмной половине, дверью к забору/овцам (раздел 5.5).
+  // Амбар стоит глубже в тёмной половине (x>0), дверью к забору/овцам (раздел 5.5).
   const barn = new Barn({ windowCount: sheepCount });
-  barn.placeOnSurface(surfacePoint, -5.0, -1.0, new THREE.Vector3(1, 0, 1));
+  barn.placeOnSurface(surfacePoint, 5.0, -1.0, new THREE.Vector3(-1, 0, 1));
   barn.addTo(scene);
 
   // Звёзды, деревья, трава и фоновые облака (раздел 5.7–5.9, п.8) —
@@ -64,28 +65,28 @@ function startGame(sessionDurationMinutes) {
   const stars = new Stars().addTo(scene);
 
   const trees = [
-    { x: 5.6, z: 1.3, day: true, scale: 1.0 },
-    { x: 6.9, z: 5.8, day: true, scale: 1.1 },
-    { x: 4.0, z: 8.4, day: true, scale: 0.9 },
-    { x: 7.4, z: -1.6, day: true, scale: 1.0 },
-    { x: -7.2, z: 2.4, day: false, scale: 1.1 },
-    { x: -2.2, z: -3.8, day: false, scale: 0.95 },
-    { x: -7.6, z: -1.8, day: false, scale: 1.0 },
-    { x: -1.8, z: 6.2, day: false, scale: 1.0 },
+    { x: -5.6, z: 1.3, day: true, scale: 1.0 },
+    { x: -6.9, z: 5.8, day: true, scale: 1.1 },
+    { x: -4.0, z: 8.4, day: true, scale: 0.9 },
+    { x: -7.4, z: -1.6, day: true, scale: 1.0 },
+    { x: 7.2, z: 2.4, day: false, scale: 1.1 },
+    { x: 2.2, z: -3.8, day: false, scale: 0.95 },
+    { x: 7.6, z: -1.8, day: false, scale: 1.0 },
+    { x: 1.8, z: 6.2, day: false, scale: 1.0 },
   ];
   const grassTufts = [
-    ...generateGrassTufts(12, 1, 7.5, 1.5, 8, true),
-    ...generateGrassTufts(12, -7.5, -1, -3, 5, false),
+    ...generateGrassTufts(12, -7.5, -1, 1.5, 8, true),
+    ...generateGrassTufts(12, 1, 7.5, -3, 5, false),
   ];
   const vegetation = new Vegetation(surfacePoint, trees, grassTufts).addTo(scene);
 
   const backgroundClouds = new BackgroundClouds([
-    { x: 6, y: 11, z: -6, spread: 1.1, scale: 1.3, day: true },
-    { x: -3, y: 13, z: -10, spread: 1.0, scale: 1.1, day: true },
-    { x: 3, y: 15, z: -14, spread: 1.3, scale: 1.5, day: true },
-    { x: -9, y: 12, z: -8, spread: 1.2, scale: 1.4, day: false },
-    { x: -14, y: 9, z: 2, spread: 1.0, scale: 1.1, day: false },
-    { x: -6, y: 16, z: -12, spread: 1.1, scale: 1.2, day: false },
+    { x: -6, y: 11, z: -6, spread: 1.1, scale: 1.3, day: true },
+    { x: 3, y: 13, z: -10, spread: 1.0, scale: 1.1, day: true },
+    { x: -3, y: 15, z: -14, spread: 1.3, scale: 1.5, day: true },
+    { x: 9, y: 12, z: -8, spread: 1.2, scale: 1.4, day: false },
+    { x: 14, y: 9, z: 2, spread: 1.0, scale: 1.1, day: false },
+    { x: 6, y: 16, z: -12, spread: 1.1, scale: 1.2, day: false },
   ]).addTo(scene);
 
   function generateGrassTufts(count, xMin, xMax, zMin, zMax, day) {
@@ -104,14 +105,14 @@ function startGame(sessionDurationMinutes) {
   // Три фоновых NPC (раздел 5.2–5.4, п.9) — опциональны, реагируют на тап,
   // без завязки на основной таймер сессии.
   const owl = new OwlFirefly();
-  owl.placeOnSurface(surfacePoint, -6.8, 1.9, new THREE.Vector3(0, 0, 1));
+  owl.placeOnSurface(surfacePoint, 6.8, 1.9, new THREE.Vector3(0, 0, 1));
   owl.addTo(scene);
 
   const cat = new Cat();
-  cat.placeOnSurface(surfacePoint, -3.0, -2.1, new THREE.Vector3(0.3, 0, 1));
+  cat.placeOnSurface(surfacePoint, 3.0, -2.1, new THREE.Vector3(-0.3, 0, 1));
   cat.addTo(scene);
 
-  const cloudNpc = new CloudNpc(new THREE.Vector3(-2, 12, -9));
+  const cloudNpc = new CloudNpc(new THREE.Vector3(2, 12, -9));
   cloudNpc.addTo(scene);
 
   const tappableMeshes = [];
@@ -159,12 +160,13 @@ function startGame(sessionDurationMinutes) {
   // сама плавно гаснет до чёрного, без ожидания игрока.
   const sessionFade = new SessionFade(document.getElementById('fade-overlay'));
 
-  // Точки маршрута овцы (раздел 4): ждёт на светлой стороне перед забором,
-  // приземляется сразу за ним на тёмной, затем сонно уходит к двери амбара.
+  // Точки маршрута овцы (раздел 4): ждёт на светлой стороне (x<0) перед
+  // забором, приземляется сразу за ним на тёмной (x>0), затем сонно уходит
+  // к двери амбара.
   const waypoints = {
-    start: { x: 2.6, z: 5.4 },
-    land: { x: -1.4, z: 2.6 },
-    walkTo: { x: -4.2, z: -0.3 },
+    start: { x: -2.6, z: 5.4 },
+    land: { x: 1.4, z: 2.6 },
+    walkTo: { x: 4.2, z: -0.3 },
   };
 
   // Очередь овец у забора (раздел 3, п.11.6): активна всегда только первая,

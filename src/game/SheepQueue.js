@@ -55,7 +55,7 @@ export class SheepQueue {
       const x = start.x + (col - (ROW_SIZE - 1) / 2) * COL_SPACING + jitterX;
       const z = start.z + row * ROW_SPACING + jitterZ;
 
-      sheep.placeOnSurface(this.surfacePoint, x, z, new THREE.Vector3(-0.3, 0, -1));
+      sheep.placeOnSurface(this.surfacePoint, x, z, new THREE.Vector3(0.3, 0, -1));
     });
   }
 
