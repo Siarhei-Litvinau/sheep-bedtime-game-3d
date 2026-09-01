@@ -289,10 +289,17 @@ function startGame(sessionDurationMinutes) {
     if (!npcConsumedPointer) sheepQueue.release();
   });
 
-  window.addEventListener('resize', () => {
+  function handleViewportChange() {
     const { width, height } = resize();
     updateCameraAspect(camera, width, height);
-  });
+  }
+  window.addEventListener('resize', handleViewportChange);
+  // Мобильный поворот экрана (раздел «мобильная адаптация»): 'resize' на
+  // некоторых мобильных браузерах срабатывает до того, как innerWidth/
+  // innerHeight обновились под новую ориентацию — небольшая задержка даёт
+  // layout устояться, иначе кадр после поворота рендерится с зажатым FOV
+  // старой ориентации.
+  window.addEventListener('orientationchange', () => setTimeout(handleViewportChange, 200));
 
   // Едва заметная кнопка паузы в углу (раздел 9) — единственный HUD поверх
   // игрового процесса. Пауза останавливает продвижение сессии/анимаций.
@@ -402,6 +409,14 @@ function wireStartScreen() {
 }
 
 wireStartScreen();
+
+// Мобильная адаптация: основной ввод игры — press-and-hold по овце (заряд
+// прыжка), а Android/iOS на долгий тап по умолчанию открывают системное
+// контекст-меню/поиск по выделению текста. CSS (`user-select`/
+// `-webkit-touch-callout: none` в style.css) убирает выделение как таковое,
+// здесь — подстраховка на случай, если contextmenu всё равно всплывёт
+// (например, у стартового экрана, ещё до канваса).
+document.addEventListener('contextmenu', (event) => event.preventDefault());
 
 // SDK Яндекс Игр (раздел 10): стартовый экран уже отрисован и интерактивен —
 // сигнализируем платформе, что можно скрывать её лоадер.

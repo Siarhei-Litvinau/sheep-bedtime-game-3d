@@ -1,5 +1,25 @@
 import * as THREE from 'three';
 
+// FOV в THREE.PerspectiveCamera — вертикальный; вся сцена (забор ±10 по X,
+// амбар, NPC) расставлена и подобрана под ландшафтный экран. На портретной
+// мобильной ориентации (aspect < 1) при фиксированном вертикальном FOV
+// горизонтальный обзор резко сужается — забор и часть сцены обрезаются по
+// бокам. fovForAspect() растит вертикальный FOV для узких экранов так, чтобы
+// приблизить горизонтальный обзор к тому, что виден на опорном 16:9
+// (не восстанавливает его один-в-один — на очень узких экранах это дало бы
+// >100° и заметный fisheye — MAX_FOV ограничивает перекос).
+const BASE_FOV = 50; // вертикальный FOV на опорном landscape-соотношении
+const REFERENCE_ASPECT = 16 / 9; // соотношение, под которое расставлена сцена (раздел 2 ревизии)
+const MAX_FOV = 78;
+
+function fovForAspect(aspect) {
+  if (aspect >= REFERENCE_ASPECT) return BASE_FOV;
+  const baseFovRad = THREE.MathUtils.degToRad(BASE_FOV);
+  const referenceHorizontalFov = 2 * Math.atan(Math.tan(baseFovRad / 2) * REFERENCE_ASPECT);
+  const targetVerticalFov = 2 * Math.atan(Math.tan(referenceHorizontalFov / 2) / aspect);
+  return THREE.MathUtils.clamp(THREE.MathUtils.radToDeg(targetVerticalFov), BASE_FOV, MAX_FOV);
+}
+
 /**
  * Камера сцены. Зафиксирована near-planet, смотрит на изогнутый горизонт
  * планеты (раздел 5.10) — снизу видна дуга поверхности, сверху небо.
@@ -7,7 +27,7 @@ import * as THREE from 'three';
  * читалась примерно на 1/3 высоты кадра.
  */
 export function createCamera(aspect) {
-  const camera = new THREE.PerspectiveCamera(50, aspect, 0.1, 500);
+  const camera = new THREE.PerspectiveCamera(fovForAspect(aspect), aspect, 0.1, 500);
 
   // Отодвинута и приподнята относительно исходных (0,7,16)/(0,2.2,0) —
   // раздел 2 ревизии (camera-and-layout-revision.md) раздвинул забор и
@@ -23,6 +43,8 @@ export function createCamera(aspect) {
 }
 
 export function updateCameraAspect(camera, width, height) {
-  camera.aspect = width / height;
+  const aspect = width / height;
+  camera.aspect = aspect;
+  camera.fov = fovForAspect(aspect);
   camera.updateProjectionMatrix();
 }
