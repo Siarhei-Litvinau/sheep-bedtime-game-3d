@@ -21,6 +21,13 @@ const SUN_COLOR_END = new THREE.Color(0xffb489);
 const SUN_INTENSITY_START = 1.2;
 const SUN_INTENSITY_END = 0.5;
 
+// Луна (раздел 3 ревизии) — приглушённый холодный боковой свет тёмной
+// половины, отдельный от тёплого sun-света. Не насыщенно-синий.
+const MOON_COLOR_START = new THREE.Color(0x8a97b8);
+const MOON_COLOR_END = new THREE.Color(0x6c7896);
+const MOON_INTENSITY_START = 0.4;
+const MOON_INTENSITY_END = 0.22;
+
 const FILL_INTENSITY_START = 0.55;
 const FILL_INTENSITY_END = 0.28;
 
@@ -48,15 +55,17 @@ const SUN_BASE_DIR = new THREE.Vector3(-14, 16, 6);
  * кадр из main.js с текущим breathingCycle.progressAt(elapsed).
  */
 export class SessionColorCurve {
-  constructor({ planet, scene, sun, fill }) {
+  constructor({ planet, scene, sun, moon, fill }) {
     this.planet = planet;
     this.scene = scene;
     this.sun = sun;
+    this.moon = moon;
     this.fill = fill;
     this._day = new THREE.Color();
     this._night = new THREE.Color();
     this._sky = new THREE.Color();
     this._sunColor = new THREE.Color();
+    this._moonColor = new THREE.Color();
   }
 
   update(progress) {
@@ -81,6 +90,13 @@ export class SessionColorCurve {
     this._sunColor.copy(SUN_COLOR_START).lerp(SUN_COLOR_END, p);
     this.sun.color.copy(this._sunColor);
     this.sun.intensity = THREE.MathUtils.lerp(SUN_INTENSITY_START, SUN_INTENSITY_END, p);
+
+    // Луна — статична по позиции (боковая, тёмная половина не имеет своей
+    // "дуги дня"), меняется только по цвету/интенсивности вместе с общей
+    // яркостью сессии, синхронно с sun/fill.
+    this._moonColor.copy(MOON_COLOR_START).lerp(MOON_COLOR_END, p);
+    this.moon.color.copy(this._moonColor);
+    this.moon.intensity = THREE.MathUtils.lerp(MOON_INTENSITY_START, MOON_INTENSITY_END, p);
 
     this.fill.intensity = THREE.MathUtils.lerp(FILL_INTENSITY_START, FILL_INTENSITY_END, p);
   }

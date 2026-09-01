@@ -35,7 +35,7 @@ function startGame(sessionDurationMinutes) {
   scene.fog = new THREE.Fog(0x0e0b16, 30, 95); // ↑ было 25/70 — сцена раздвинута (раздел 2 ревизии)
 
   const camera = createCamera(window.innerWidth / window.innerHeight);
-  const { sun, fill } = createLighting(scene);
+  const { sun, moon, fill } = createLighting(scene);
 
   const planet = new Planet().addTo(scene);
   // Ориентация зафиксирована (camera-and-layout-revision.md, раздел 1):
@@ -205,7 +205,7 @@ function startGame(sessionDurationMinutes) {
   // Цветовая/световая кривая сессии (раздел 6): яркость, насыщенность,
   // цветовая температура и позиция границы день-ночь — функция прогресса
   // сессии (0..1), синхронизирована с той же кривой дыхательного цикла.
-  const colorCurve = new SessionColorCurve({ planet, scene, sun, fill });
+  const colorCurve = new SessionColorCurve({ planet, scene, sun, moon, fill });
   colorCurve.update(0);
 
   // Тап по NPC не должен также запускать заряд прыжка овцы — если тап
