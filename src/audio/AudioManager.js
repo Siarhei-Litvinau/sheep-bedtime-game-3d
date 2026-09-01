@@ -1,3 +1,5 @@
+import { createAudioDebugOverlay } from './debugOverlay.js';
+
 // Звук (audio-download-prompt.md, раздел 3 — таблица событий → файлы).
 // Файлы реально лежат в public/audio/ (не assets/audio/, как в промте:
 // Vite отдаёт как есть только public/, assets/audio/ в корне проекта в
@@ -45,6 +47,7 @@ export class AudioManager {
     this._activeLoops = new Set();
     this._unlocked = false;
     this._musicSessionMultiplier = 1;
+    this._debug = createAudioDebugOverlay(); // no-op пока не открыто с ?audiodebug=1
   }
 
   /**
@@ -67,18 +70,24 @@ export class AudioManager {
    * следующий жест, пока `context.state` реально не станет 'running'.
    */
   unlock() {
+    this._debug.log(`unlock() called, _unlocked=${this._unlocked}`);
     if (this._unlocked) return;
     this._unlocked = true;
 
     const Ctx = window.AudioContext || window.webkitAudioContext;
-    if (!Ctx) return; // старый браузер без Web Audio — тихо без звука, не критично
+    if (!Ctx) {
+      this._debug.log('NO AudioContext/webkitAudioContext on window — Web Audio unsupported');
+      return; // старый браузер без Web Audio — тихо без звука, не критично
+    }
 
     this.context = new Ctx();
+    this._debug.log(`AudioContext created, initial state=${this.context.state}, sampleRate=${this.context.sampleRate}`);
     // Не гейтим DEV — это единственный способ увидеть состояние на реальном
     // телефоне через удалённый девтулз (chrome://inspect / Web Inspector),
     // раз уж window.__debug в прод-сборке не существует.
     this.context.onstatechange = () => {
       console.log(`[audio] AudioContext state → ${this.context.state}`);
+      this._debug.log(`onstatechange → ${this.context.state}`);
     };
 
     this.sfxBus = this.context.createGain();
@@ -121,9 +130,11 @@ export class AudioManager {
    */
   _armUnlockRetry() {
     const events = ['pointerdown', 'touchend', 'keydown', 'mousedown'];
-    const attempt = () => {
+    const attempt = (event) => {
+      this._debug.log(`unlock retry via "${event.type}", state before=${this.context?.state}`);
       this._primeSilent();
       if (this.context && this.context.state === 'running') {
+        this._debug.log('context confirmed running — retry listeners removed');
         events.forEach((evt) => document.removeEventListener(evt, attempt));
       }
     };
@@ -155,16 +166,22 @@ export class AudioManager {
 
   async _fetchBuffer(relativePath) {
     const url = `${import.meta.env.BASE_URL}${relativePath}`;
+    this._debug.log(`fetching "${url}"...`);
     try {
       const res = await fetch(url);
+      this._debug.log(`"${relativePath}" HTTP ${res.status}, content-type=${res.headers.get('content-type')}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const arrayBuffer = await res.arrayBuffer();
-      return await this.context.decodeAudioData(arrayBuffer);
+      this._debug.log(`"${relativePath}" fetched ${arrayBuffer.byteLength} bytes, decoding...`);
+      const decoded = await this.context.decodeAudioData(arrayBuffer);
+      this._debug.log(`"${relativePath}" decoded OK, duration=${decoded.duration.toFixed(2)}s`);
+      return decoded;
     } catch (err) {
       // Не гейтим DEV — на реальном телефоне это единственная зацепка через
       // удалённый девтулз, почему конкретный файл молча не звучит (fetch
       // 404/CORS или decodeAudioData не смог разобрать формат).
       console.warn(`[audio] "${relativePath}" не загружен — звук пропущен (см. audio-download-prompt.md, раздел 4)`, err);
+      this._debug.log(`"${relativePath}" FAILED: ${err?.message ?? err}`);
       return null;
     }
   }
@@ -177,6 +194,7 @@ export class AudioManager {
     source.connect(this.musicBus);
     source.start();
     this.musicSource = source;
+    this._debug.log(`music started, context.state=${this.context.state}`);
   }
 
   /**
@@ -186,9 +204,15 @@ export class AudioManager {
    * слегка повысить тон программно").
    */
   play(key, { volume = 1, rate = 1 } = {}) {
-    if (!this.context || this.context.state !== 'running') return;
+    if (!this.context || this.context.state !== 'running') {
+      this._debug.log(`play("${key}") SKIPPED — context.state=${this.context?.state}`);
+      return;
+    }
     const buffer = this.buffers.get(key);
-    if (!buffer) return;
+    if (!buffer) {
+      this._debug.log(`play("${key}") SKIPPED — buffer not loaded`);
+      return;
+    }
 
     const source = this.context.createBufferSource();
     source.buffer = buffer;
