@@ -52,13 +52,19 @@ export class AudioManager {
    * синхронно из обработчика пользовательского жеста (клик по кнопке
    * старта сессии в main.js) — иначе браузер не разрешит звук.
    *
-   * Мобильные браузеры (в первую очередь iOS Safari) заметно строже
-   * desktop: одного `resume()` иногда недостаточно, чтобы контекст реально
-   * перешёл в 'running' — надёжно работает только реальный playback,
-   * запущенный синхронно внутри жеста, поэтому сразу же проигрываем
-   * тишину. Плюс сам контекст может снова заснуть при уходе вкладки в фон/
-   * блокировке экрана — на этот случай есть resume(), которую main.js
-   * дёргает на каждом тапе по канвасу.
+   * Мобильные браузеры (в первую очередь любой браузер на iOS — Apple
+   * обязывает их все работать на движке WebKit, так что "Chrome" на iPhone
+   * это WebKit, а не Chromium) заметно строже desktop: одного `resume()`
+   * в первом же жесте иногда недостаточно, чтобы контекст реально перешёл
+   * в 'running', даже если по спецификации всё сделано синхронно правильно
+   * — известная особенность реальных мобильных браузеров (тот же обход
+   * нужен, например, howler.js). **Важно**: проверка в DevTools через
+   * "мобильную версию"/эмуляцию устройства ничего не доказывает — это
+   * по-прежнему настоящий desktop Chromium с его обычным (нестрогим)
+   * аудио-стеком, просто с подменённым viewport/UA; она не может
+   * воспроизвести проблему реального устройства. Поэтому здесь не одна
+   * попытка, а `_armUnlockRetry()` — довешивает повтор на каждый
+   * следующий жест, пока `context.state` реально не станет 'running'.
    */
   unlock() {
     if (this._unlocked) return;
@@ -68,14 +74,12 @@ export class AudioManager {
     if (!Ctx) return; // старый браузер без Web Audio — тихо без звука, не критично
 
     this.context = new Ctx();
-
-    const silentBuffer = this.context.createBuffer(1, 1, this.context.sampleRate);
-    const silentSource = this.context.createBufferSource();
-    silentSource.buffer = silentBuffer;
-    silentSource.connect(this.context.destination);
-    silentSource.start(0);
-
-    this.resume();
+    // Не гейтим DEV — это единственный способ увидеть состояние на реальном
+    // телефоне через удалённый девтулз (chrome://inspect / Web Inspector),
+    // раз уж window.__debug в прод-сборке не существует.
+    this.context.onstatechange = () => {
+      console.log(`[audio] AudioContext state → ${this.context.state}`);
+    };
 
     this.sfxBus = this.context.createGain();
     this.sfxBus.gain.value = SFX_BUS_VOLUME;
@@ -85,8 +89,45 @@ export class AudioManager {
     this.musicBus.gain.value = 0; // громкость подтянет setSessionProgress() на первом кадре
     this.musicBus.connect(this.context.destination);
 
+    this._primeSilent();
+    this._armUnlockRetry();
+
     for (const key of Object.keys(SFX_FILES)) this._loadSfx(key);
     this._loadMusic();
+  }
+
+  /** Разовая попытка "растолкать" контекст: тишина + resume(). */
+  _primeSilent() {
+    if (!this.context) return;
+    const buffer = this.context.createBuffer(1, 1, this.context.sampleRate);
+    const source = this.context.createBufferSource();
+    source.buffer = buffer;
+    source.connect(this.context.destination);
+    source.start(0);
+    this.resume();
+  }
+
+  /**
+   * Довешивает повторную попытку разблокировки на каждый следующий жест
+   * (тап/клик/клавиша) в дополнение к попытке из unlock() — пока
+   * context.state реально не подтвердит 'running', сам себя не снимает.
+   * Именно этого шага не хватало: единичная попытка технически верна по
+   * спецификации, но на части реальных мобильных браузеров (в первую
+   * очередь WebKit на iOS) первый вызов иногда не успевает/не срабатывает,
+   * а второй-третий — срабатывают. `{ passive: true }` — здесь не нужен
+   * preventDefault, слушатели не должны мешать остальным обработчикам тех
+   * же событий (canvas pointerdown и т.д.), только слушают проходящий мимо
+   * жест.
+   */
+  _armUnlockRetry() {
+    const events = ['pointerdown', 'touchend', 'keydown', 'mousedown'];
+    const attempt = () => {
+      this._primeSilent();
+      if (this.context && this.context.state === 'running') {
+        events.forEach((evt) => document.removeEventListener(evt, attempt));
+      }
+    };
+    events.forEach((evt) => document.addEventListener(evt, attempt, { passive: true }));
   }
 
   /**
@@ -120,9 +161,10 @@ export class AudioManager {
       const arrayBuffer = await res.arrayBuffer();
       return await this.context.decodeAudioData(arrayBuffer);
     } catch (err) {
-      if (import.meta.env.DEV) {
-        console.warn(`[audio] "${relativePath}" не загружен — звук пропущен (см. audio-download-prompt.md, раздел 4)`, err);
-      }
+      // Не гейтим DEV — на реальном телефоне это единственная зацепка через
+      // удалённый девтулз, почему конкретный файл молча не звучит (fetch
+      // 404/CORS или decodeAudioData не смог разобрать формат).
+      console.warn(`[audio] "${relativePath}" не загружен — звук пропущен (см. audio-download-prompt.md, раздел 4)`, err);
       return null;
     }
   }
