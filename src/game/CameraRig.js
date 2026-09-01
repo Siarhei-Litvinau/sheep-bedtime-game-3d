@@ -1,7 +1,10 @@
 import * as THREE from 'three';
 
+import { fovForAspect, CLOSE_UP_FOV } from '../core/camera.js';
+
 const POS_SMOOTH = 2.4; // 1/сек — скорость экспоненциального сглаживания позиции камеры
 const LOOK_SMOOTH = 3.2; // цель камеры "догоняет" чуть быстрее позиции — меньше ощущение запаздывания
+const FOV_SMOOTH = 3.2; // тот же темп, что и LOOK_SMOOTH — зум синхронен со сменой цели взгляда
 
 const WORLD_UP = new THREE.Vector3(0, 1, 0);
 
@@ -118,6 +121,16 @@ export class CameraRig {
     this.camera.position.lerp(this._desiredPos, posAlpha);
     this._currentLookAt.lerp(this._desiredLookAt, lookAlpha);
     this.camera.lookAt(this._currentLookAt);
+
+    // Мобильная адаптация (портретная ориентация): широкий план растит FOV
+    // на узких экранах (core/camera.js → fovForAspect), close-up — держит
+    // фиксированный CLOSE_UP_FOV, иначе тот же рост FOV дал бы fisheye на
+    // траве/деревьях вплотную к объективу в SHEEP_SELECTED/JUMP_CINEMATIC.
+    const isCloseUp = this.state === 'SHEEP_SELECTED' || this.state === 'JUMP_CINEMATIC';
+    const desiredFov = isCloseUp ? CLOSE_UP_FOV : fovForAspect(this.camera.aspect);
+    const fovAlpha = 1 - Math.exp(-FOV_SMOOTH * dt);
+    this.camera.fov = THREE.MathUtils.lerp(this.camera.fov, desiredFov, fovAlpha);
+    this.camera.updateProjectionMatrix();
   }
 }
 

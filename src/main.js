@@ -269,6 +269,10 @@ function startGame(sessionDurationMinutes) {
   let npcConsumedPointer = false;
   canvas.addEventListener('pointerdown', (event) => {
     event.preventDefault();
+    // Мобильные ОС усыпляют AudioContext при блокировке экрана/уходе
+    // приложения в фон — на каждом тапе пробуем разбудить его снова
+    // (no-op, если он и так уже 'running').
+    audio.resume();
     npcConsumedPointer = tryTapNpc(event);
     if (!npcConsumedPointer && isNearActiveSheep(event)) {
       sheepQueue.startCharge();
@@ -300,6 +304,12 @@ function startGame(sessionDurationMinutes) {
   // layout устояться, иначе кадр после поворота рендерится с зажатым FOV
   // старой ориентации.
   window.addEventListener('orientationchange', () => setTimeout(handleViewportChange, 200));
+
+  // Возврат из фона (свернули приложение/разблокировали экран) — та же
+  // причина, что и на pointerdown, но ловит момент до первого тапа.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') audio.resume();
+  });
 
   // Едва заметная кнопка паузы в углу (раздел 9) — единственный HUD поверх
   // игрового процесса. Пауза останавливает продвижение сессии/анимаций.

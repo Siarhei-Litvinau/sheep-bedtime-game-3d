@@ -51,6 +51,14 @@ export class AudioManager {
    * Создаёт AudioContext и начинает загрузку файлов. Должен вызываться
    * синхронно из обработчика пользовательского жеста (клик по кнопке
    * старта сессии в main.js) — иначе браузер не разрешит звук.
+   *
+   * Мобильные браузеры (в первую очередь iOS Safari) заметно строже
+   * desktop: одного `resume()` иногда недостаточно, чтобы контекст реально
+   * перешёл в 'running' — надёжно работает только реальный playback,
+   * запущенный синхронно внутри жеста, поэтому сразу же проигрываем
+   * тишину. Плюс сам контекст может снова заснуть при уходе вкладки в фон/
+   * блокировке экрана — на этот случай есть resume(), которую main.js
+   * дёргает на каждом тапе по канвасу.
    */
   unlock() {
     if (this._unlocked) return;
@@ -60,7 +68,14 @@ export class AudioManager {
     if (!Ctx) return; // старый браузер без Web Audio — тихо без звука, не критично
 
     this.context = new Ctx();
-    if (this.context.state === 'suspended') this.context.resume();
+
+    const silentBuffer = this.context.createBuffer(1, 1, this.context.sampleRate);
+    const silentSource = this.context.createBufferSource();
+    silentSource.buffer = silentBuffer;
+    silentSource.connect(this.context.destination);
+    silentSource.start(0);
+
+    this.resume();
 
     this.sfxBus = this.context.createGain();
     this.sfxBus.gain.value = SFX_BUS_VOLUME;
@@ -72,6 +87,19 @@ export class AudioManager {
 
     for (const key of Object.keys(SFX_FILES)) this._loadSfx(key);
     this._loadMusic();
+  }
+
+  /**
+   * Пытается разбудить AudioContext, если он 'suspended' — безопасно
+   * дёргать откуда угодно, в т.ч. до unlock() (тогда просто no-op).
+   * Мобильные ОС усыпляют контекст при блокировке экрана/уходе в фон —
+   * main.js вызывает это на каждом тапе по канвасу, чтобы звук не пропадал
+   * молча после первого же сворачивания приложения.
+   */
+  resume() {
+    if (this.context && this.context.state === 'suspended') {
+      this.context.resume();
+    }
   }
 
   async _loadSfx(key) {

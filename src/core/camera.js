@@ -8,17 +8,28 @@ import * as THREE from 'three';
 // приблизить горизонтальный обзор к тому, что виден на опорном 16:9
 // (не восстанавливает его один-в-один — на очень узких экранах это дало бы
 // >100° и заметный fisheye — MAX_FOV ограничивает перекос).
-const BASE_FOV = 50; // вертикальный FOV на опорном landscape-соотношении
+const BASE_FOV = 50; // вертикальный FOV на опорном landscape-соотношении и в close-up ракурсах CameraRig
 const REFERENCE_ASPECT = 16 / 9; // соотношение, под которое расставлена сцена (раздел 2 ревизии)
-const MAX_FOV = 78;
+const MAX_FOV = 90;
 
-function fovForAspect(aspect) {
+/**
+ * FOV для общего плана (FLOCK_VIEW/RETURN_TO_FLOCK) — растёт на узких
+ * портретных экранах, чтобы забор/амбар/отара не обрезались по бокам.
+ * **Не используется** для close-up ракурсов CameraRig (SHEEP_SELECTED/
+ * JUMP_CINEMATIC, см. CLOSE_UP_FOV) — там камера стоит вплотную к сцене
+ * (трава/деревья у объектива), и тот же рост FOV даёт заметный fisheye на
+ * ближних объектах, ломая заранее подобранную композицию кадра.
+ */
+export function fovForAspect(aspect) {
   if (aspect >= REFERENCE_ASPECT) return BASE_FOV;
   const baseFovRad = THREE.MathUtils.degToRad(BASE_FOV);
   const referenceHorizontalFov = 2 * Math.atan(Math.tan(baseFovRad / 2) * REFERENCE_ASPECT);
   const targetVerticalFov = 2 * Math.atan(Math.tan(referenceHorizontalFov / 2) / aspect);
   return THREE.MathUtils.clamp(THREE.MathUtils.radToDeg(targetVerticalFov), BASE_FOV, MAX_FOV);
 }
+
+/** FOV close-up ракурсов CameraRig — фиксирован, не зависит от ориентации экрана (см. fovForAspect). */
+export const CLOSE_UP_FOV = BASE_FOV;
 
 /**
  * Камера сцены. Зафиксирована near-planet, смотрит на изогнутый горизонт
