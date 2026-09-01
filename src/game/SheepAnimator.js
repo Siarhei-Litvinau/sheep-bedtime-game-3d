@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { orientUpForward } from '../world/surface.js';
 
 const MAX_CHARGE = 1.4; // сек удержания, после которых заряд не растёт дальше
+const APPROACH_DURATION = 3.0; // медленный подход от места выпаса к забору, до этого тап по овце не работает
 const LAND_DURATION = 0.32;
 // ↑ с 1.3 (раздел 2 ревизии: main.js раздвинул land→walkTo примерно в 2 раза) —
 // без этого овца проезжала бы удлинённый путь к амбару с той же длительностью,
@@ -17,19 +18,24 @@ const BLACK = new THREE.Color(0x000000);
 const DEFAULT_BREATHING_CPM = 13.5; // средняя стартовая скорость (раздел 3), пока сессия не запущена
 
 /**
- * Управляет 4 фазами прыжка одной овцы из очереди (раздел 4, SheepQueue)
- * поверх состояний из раздела 5.1: idle → charge → jump → land →
- * walk_sleepy → yawn → fade → done. Одноразовый: по завершении зовёт
- * callbacks.onComplete() вместо повторного цикла (когда onComplete не
- * задан — зацикливается сама, это удобно для точечного тестирования).
- * Темп фаз jump/land/walk/yawn/fade и частота дыхания в idle управляются
- * извне кривой замедления дыхательного цикла (раздел 3) через
+ * Управляет фазами одной овцы из очереди (раздел 4, SheepQueue) поверх
+ * состояний из раздела 5.1: approach → idle → charge → jump → land →
+ * walk_sleepy → yawn → fade → done. `approach` — овца сама медленно идёт от
+ * точки выпаса (`graze`, в стороне от забора) к забору (`start`); пока она
+ * не дойдёт и не перейдёт в `idle`, `startCharge()` не срабатывает (см. её
+ * guard ниже) — тап по ней до этого момента ни на что не влияет. Одноразовый:
+ * по завершении зовёт callbacks.onComplete() вместо повторного цикла (когда
+ * onComplete не задан — зацикливается сама, это удобно для точечного
+ * тестирования).
+ * Темп фаз approach/jump/land/walk/yawn/fade и частота дыхания в idle
+ * управляются извне кривой замедления дыхательного цикла (раздел 3) через
  * setCyclePace()/setBreathingCpm() — вызывается каждый кадр из main.js.
  */
 export class SheepAnimator {
-  constructor(sheep, surfacePoint, { start, land, walkTo }, effects, callbacks = {}) {
+  constructor(sheep, surfacePoint, { graze, start, land, walkTo }, effects, callbacks = {}) {
     this.sheep = sheep;
     this.surfacePoint = surfacePoint;
+    this.graze = graze;
     this.start = start;
     this.land = land;
     this.walkTo = walkTo;
@@ -51,7 +57,8 @@ export class SheepAnimator {
 
     this.baseBodyScale = sheep.body.scale.clone();
 
-    this.state = 'idle';
+    // Если точка выпаса не задана — овца сразу стоит у забора (idle), как раньше.
+    this.state = graze ? 'approach' : 'idle';
     this.t = 0;
     this.holdTime = 0;
     this.jumpDuration = 0.8;
@@ -59,7 +66,8 @@ export class SheepAnimator {
     this.sparkleSpawned = false;
     this._lastNormal = new THREE.Vector3(0, 1, 0);
 
-    this._applyTransform(start.x, start.z, 0);
+    const initial = graze || start;
+    this._applyTransform(initial.x, initial.z, 0);
   }
 
   /** Множитель темпа фаз (0..1+), от текущей скорости дыхательного цикла сессии. */
@@ -81,6 +89,16 @@ export class SheepAnimator {
     return this.state === 'idle';
   }
 
+  /** Нормаль поверхности в текущей позиции овцы — нужна камере (CameraRig) для offset'ов. */
+  get surfaceNormal() {
+    return this._lastNormal;
+  }
+
+  /** Прогресс фазы прыжка (0..1) — камера (JUMP_CINEMATIC) использует его для zoom-out на пике дуги. */
+  get jumpProgress() {
+    return this.state === 'jump' ? Math.min(this.t, 1) : 0;
+  }
+
   startCharge() {
     if (this.state !== 'idle') return;
     this.state = 'charge';
@@ -90,11 +108,15 @@ export class SheepAnimator {
   release() {
     if (this.state !== 'charge') return;
     const chargeT = Math.min(this.holdTime / MAX_CHARGE, 1);
-    this.jumpHeight = 0.9 + chargeT * 0.7;
-    // ↑ база и разброс с 0.65/0.35 (раздел 2 ревизии: start→land стал заметно
-    // длиннее) — сохраняет прежнюю горизонтальную скорость прыжка на новой
-    // дистанции, иначе овца пролетала бы её неестественно быстро.
-    this.jumpDuration = 0.85 + chargeT * 0.46;
+    // Разброс высоты увеличен (было 0.9–1.6) — чем дольше держать заряд,
+    // тем явственно выше прыжок, а не едва заметная разница. Минимум (0.9)
+    // не понижен — ниже верхней жерди забора (0.68, Fence.js RAIL_HEIGHTS)
+    // овца казалась бы не перепрыгивающей его, а проходящей сквозь.
+    this.jumpHeight = 0.9 + chargeT * 1.3;
+    // Длительность растёт вместе с высотой (не только с базовым 0.85/0.46,
+    // как раньше) — иначе более высокий прыжок выглядел бы неестественно
+    // резким при той же горизонтальной дистанции start→land.
+    this.jumpDuration = 0.85 + chargeT * 0.85;
     this.state = 'jump';
     this.t = 0;
     this.sparkleSpawned = false;
@@ -103,6 +125,9 @@ export class SheepAnimator {
   update(dt) {
     const scaledDt = dt * this.cyclePace;
     switch (this.state) {
+      case 'approach':
+        this._updateApproach(scaledDt);
+        break;
       case 'idle':
         this._updateIdle(dt);
         break;
@@ -130,12 +155,37 @@ export class SheepAnimator {
     }
   }
 
-  _applyTransform(x, z, normalLift) {
+  _applyTransform(x, z, normalLift, tumbleAngle = 0) {
     const { position, normal } = this.surfacePoint(x, z);
     position.addScaledVector(normal, normalLift);
     this.sheep.group.position.copy(position);
     this.sheep.group.quaternion.copy(orientUpForward(normal, this.forwardHint));
+    if (tumbleAngle) {
+      // Кувырок в воздухе (camera-and-layout-revision.md, раздел 5): доп.
+      // вращение вокруг локальной оси "право" поверх ориентации по нормали
+      // планеты — тело крутится, не теряя посадку по кривизне поверхности.
+      this.sheep.group.quaternion.multiply(
+        new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), tumbleAngle)
+      );
+    }
     this._lastNormal = normal;
+  }
+
+  _updateApproach(dt) {
+    // Медленный самостоятельный подход от точки выпаса к забору — до его
+    // завершения (переход в idle) startCharge() не срабатывает (guard там же).
+    this.t += dt / APPROACH_DURATION;
+    const t = Math.min(this.t, 1);
+    const x = THREE.MathUtils.lerp(this.graze.x, this.start.x, t);
+    const z = THREE.MathUtils.lerp(this.graze.z, this.start.z, t);
+    const cycles = 2.5;
+    const bob = Math.abs(Math.sin(t * cycles * Math.PI * 2)) * 0.05;
+    this._applyTransform(x, z, bob);
+
+    if (this.t >= 1) {
+      this.state = 'idle';
+      this.t = 0;
+    }
   }
 
   _updateIdle(dt) {
@@ -166,7 +216,11 @@ export class SheepAnimator {
     const x = THREE.MathUtils.lerp(this.start.x, this.land.x, t);
     const z = THREE.MathUtils.lerp(this.start.z, this.land.z, t);
     const arc = 4 * this.jumpHeight * t * (1 - t);
-    this._applyTransform(x, z, arc);
+    // Кувырок на ~360°, синхронный с длительностью нахождения в воздухе
+    // (раздел 4 ревизии, состояние JUMP_CINEMATIC) — не с длительностью
+    // прыжка вообще, а именно с t внутри самой фазы jump.
+    const tumbleAngle = t * Math.PI * 2;
+    this._applyTransform(x, z, arc, tumbleAngle);
 
     const stretch = Math.sin(Math.PI * t);
     this.sheep.body.scale.set(

@@ -10,8 +10,9 @@ const JITTER = 0.14;
 /**
  * Очередь овец у забора (раздел 3, пункт 11.6). Число овец — функция от
  * длительности сессии (sheepCountForSession). Активна всегда только
- * первая — на ней работает SheepAnimator и её слушает ввод игрока; за
- * ней ждёт небольшая отара, выстроенная компактным строем позади старта,
+ * первая — на ней работает SheepAnimator (она сама подходит от точки
+ * выпаса `graze` к забору, см. фазу 'approach') и её слушает ввод игрока;
+ * за ней ждёт небольшая отара, выстроенная компактным строем у `graze`,
  * а не длинной цепочкой (чтобы не выезжать за камеру при 12–15 овцах).
  * Когда активная овца скрывается у амбара, очередь подтягивается и
  * следующая овца становится активной — до полного исчерпания.
@@ -44,16 +45,19 @@ export class SheepQueue {
   }
 
   _layoutWaitingQueue() {
-    const { start } = this.waypoints;
+    // Ждущее стадо пасётся у точки graze — заметно дальше от забора, чем
+    // активная овца, которая сама медленно подходит к нему (SheepAnimator
+    // 'approach'). Слот 0 — это сама graze-точка, откуда стартует активная.
+    const { graze } = this.waypoints;
     this.pending.forEach((sheep, i) => {
-      const slot = i + 1; // слот 0 занят активной овцой на старте
+      const slot = i + 1;
       const row = Math.floor((slot - 1) / ROW_SIZE) + 1;
       const col = (slot - 1) % ROW_SIZE;
       const jitterX = (pseudoRandom(slot) - 0.5) * JITTER;
       const jitterZ = (pseudoRandom(slot + 100) - 0.5) * JITTER;
 
-      const x = start.x + (col - (ROW_SIZE - 1) / 2) * COL_SPACING + jitterX;
-      const z = start.z + row * ROW_SPACING + jitterZ;
+      const x = graze.x + (col - (ROW_SIZE - 1) / 2) * COL_SPACING + jitterX;
+      const z = graze.z + row * ROW_SPACING + jitterZ;
 
       sheep.placeOnSurface(this.surfacePoint, x, z, new THREE.Vector3(0.3, 0, -1));
     });

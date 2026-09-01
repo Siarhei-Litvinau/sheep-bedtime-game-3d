@@ -7,6 +7,7 @@ import { Fence } from './world/Fence.js';
 import { Barn } from './world/Barn.js';
 import { createSurfaceSampler } from './world/surface.js';
 import { SheepQueue } from './game/SheepQueue.js';
+import { CameraRig, cameraStateForSheepPhase } from './game/CameraRig.js';
 import { sheepCountForSession } from './game/sheepCount.js';
 import { BreathingCycle } from './game/BreathingCycle.js';
 import { SessionColorCurve } from './game/SessionColorCurve.js';
@@ -170,17 +171,30 @@ function startGame(sessionDurationMinutes) {
   // сама плавно гаснет до чёрного, без ожидания игрока.
   const sessionFade = new SessionFade(document.getElementById('fade-overlay'));
 
-  // Точки маршрута овцы (раздел 4): ждёт на светлой стороне (x<0) перед
-  // забором, приземляется сразу за ним на тёмной (x>0), затем сонно уходит
+  // Точки маршрута овцы (раздел 4): пасётся на светлой стороне (x<0) в
+  // стороне от забора (`graze`), сама медленно подходит к нему (`start`,
+  // фаза SheepAnimator 'approach') — тап работает только после этого,
+  // приземляется сразу за забором на тёмной (x>0), затем сонно уходит
   // к двери амбара.
   // Раздвинуты (раздел 2 ревизии): дистанция прыжка (start→land) и особенно
   // путь после приземления (land→walkTo) заметно длиннее — амбар теперь
   // далеко в глубине тёмной половины, а не сразу за забором.
   const waypoints = {
+    graze: { x: -4.0, z: 10.5 },
     start: { x: -4.0, z: 7.0 },
     land: { x: 2.4, z: 3.6 },
     walkTo: { x: 8.5, z: -3.5 },
   };
+
+  // Камера как конечный автомат из 5 состояний (camera-and-layout-revision.md,
+  // раздел 4) — сама камера в core/camera.js теперь лишь задаёт стартовую/
+  // "общую" позицию (FLOCK_VIEW), а переходы между состояниями и слежение
+  // за активной овцой ведёт CameraRig, дёргается каждый кадр из tick().
+  const cameraRig = new CameraRig(camera, {
+    flockPosition: camera.position.clone(),
+    flockLookAt: new THREE.Vector3(0, 2.6, -1),
+    forwardDir: new THREE.Vector3(waypoints.land.x - waypoints.start.x, 0, waypoints.land.z - waypoints.start.z),
+  });
 
   // Очередь овец у забора (раздел 3, п.11.6): активна всегда только первая,
   // остальные ждут позади компактным строем; по завершении цикла активной
@@ -208,13 +222,32 @@ function startGame(sessionDurationMinutes) {
   const colorCurve = new SessionColorCurve({ planet, scene, sun, moon, fill });
   colorCurve.update(0);
 
+  // Пока активная овца сама идёт от точки выпаса к забору (SheepAnimator
+  // 'approach'), тап по ней не должен запускать заряд — сначала она должна
+  // дойти и встать (state === 'idle', см. guard в startCharge()). Помимо
+  // этого, тап должен попадать в неё саму или в область рядом с ней, а не в
+  // любую точку канваса — иначе не читалось бы, что действие адресовано
+  // конкретной овце.
+  const SHEEP_TAP_RADIUS_PX = 100;
+  function isNearActiveSheep(event) {
+    const sheep = sheepQueue.activeSheep;
+    if (!sheep || sheepQueue.animator?.state !== 'idle') return false;
+    const screenPos = sheep.group.position.clone().project(camera);
+    const rect = canvas.getBoundingClientRect();
+    const screenX = (screenPos.x * 0.5 + 0.5) * rect.width + rect.left;
+    const screenY = (-screenPos.y * 0.5 + 0.5) * rect.height + rect.top;
+    const dx = event.clientX - screenX;
+    const dy = event.clientY - screenY;
+    return Math.sqrt(dx * dx + dy * dy) <= SHEEP_TAP_RADIUS_PX;
+  }
+
   // Тап по NPC не должен также запускать заряд прыжка овцы — если тап
   // попал по NPC, заряд для этого касания не стартует.
   let npcConsumedPointer = false;
   canvas.addEventListener('pointerdown', (event) => {
     event.preventDefault();
     npcConsumedPointer = tryTapNpc(event);
-    if (!npcConsumedPointer) {
+    if (!npcConsumedPointer && isNearActiveSheep(event)) {
       sheepQueue.startCharge();
     }
   });
@@ -268,6 +301,20 @@ function startGame(sessionDurationMinutes) {
       cat.update(dt);
       cloudNpc.update(dt);
       sessionFade.update(dt);
+
+      const animator = sheepQueue.animator;
+      if (animator && sheepQueue.activeSheep) {
+        cameraRig.setState(cameraStateForSheepPhase(animator.state));
+        cameraRig.update(dt, {
+          sheepPosition: sheepQueue.activeSheep.group.position,
+          sheepNormal: animator.surfaceNormal,
+          jumpProgress: animator.jumpProgress,
+          breathingCpm: cpm,
+        });
+      } else {
+        cameraRig.setState('FLOCK_VIEW');
+        cameraRig.update(dt, { breathingCpm: cpm });
+      }
     }
 
     renderer.render(scene, camera);
@@ -296,6 +343,7 @@ function startGame(sessionDurationMinutes) {
       getSessionElapsed: () => sessionElapsed,
       renderer,
       camera,
+      cameraRig,
       forceRender: () => renderer.render(scene, camera),
     };
   }
