@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <title>Овцы перед сном — иконка</title>
+  <!-- Строго квадрат, без скруглений (раздел 10) -->
+  <rect width="512" height="512" fill="#100c18" />
+
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="78%" r="60%">
+      <stop offset="0%" stop-color="#3a2a22" stop-opacity="0.9" />
+      <stop offset="100%" stop-color="#100c18" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#glow)" />
+
+  <!-- звёзды -->
+  <g fill="#f2e6cf">
+    <circle cx="96" cy="88" r="3.4" opacity="0.9" />
+    <circle cx="150" cy="140" r="2.2" opacity="0.6" />
+    <circle cx="410" cy="70" r="3" opacity="0.8" />
+    <circle cx="440" cy="150" r="2.4" opacity="0.55" />
+    <circle cx="70" cy="200" r="2.4" opacity="0.7" />
+    <circle cx="360" cy="120" r="2" opacity="0.5" />
+    <circle cx="256" cy="60" r="2.6" opacity="0.65" />
+  </g>
+
+  <!-- силуэт прыгающей овцы: единый светлый силуэт хорошо читается на тёмном фоне даже в маленьком размере -->
+  <g>
+    <!-- задние ноги, вытянуты назад в прыжке -->
+    <path d="M 300 350 L 336 404" stroke="#eaded0" stroke-width="20" stroke-linecap="round" />
+    <path d="M 322 344 L 366 392" stroke="#eaded0" stroke-width="20" stroke-linecap="round" />
+    <!-- передние ноги, поджаты вперёд -->
+    <path d="M 205 345 L 174 396" stroke="#eaded0" stroke-width="20" stroke-linecap="round" />
+    <path d="M 227 356 L 206 408" stroke="#eaded0" stroke-width="20" stroke-linecap="round" />
+
+    <!-- тело -->
+    <ellipse cx="262" cy="300" rx="100" ry="72" fill="#eaded0" />
+
+    <!-- хвост, поверх тела -->
+    <circle cx="358" cy="292" r="19" fill="#eaded0" />
+
+    <!-- голова -->
+    <circle cx="178" cy="258" r="46" fill="#2c231c" />
+    <!-- ухо -->
+    <path d="M 158 220 L 148 190 L 178 212 Z" fill="#2c231c" />
+  </g>
+</svg>

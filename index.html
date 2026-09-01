@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+    <title>Овцы перед сном</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="stylesheet" href="/src/style.css" />
+    <!-- SDK Яндекс Игр (раздел 10). Вне платформы window.YaGames просто не
+         определится — весь код в src/platform/yandex.js на это рассчитан. -->
+    <script src="https://yandex.ru/games/sdk/v2"></script>
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="scene"></canvas>
+      <div id="fade-overlay"></div>
+      <button id="pause-button" aria-label="Пауза" hidden></button>
+
+      <div id="start-screen">
+        <div class="start-card">
+          <h1>Овцы перед сном</h1>
+          <p>Держите — овца заряжается разбегом, отпустите — прыгает через забор. Выберите длительность сессии.</p>
+          <div class="start-buttons">
+            <button id="btn-short" class="start-btn" type="button">
+              <span class="start-btn-title">Короткая</span>
+              <span class="start-btn-sub">5–10 минут</span>
+            </button>
+            <button id="btn-full" class="start-btn" type="button">
+              <span class="start-btn-title">Полная</span>
+              <span class="start-btn-sub">12–18 минут</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

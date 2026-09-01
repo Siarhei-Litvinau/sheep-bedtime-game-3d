@@ -1,0 +1,18 @@
+{
+  "name": "sheep-bedtime-game",
+  "version": "0.1.0",
+  "description": "Овцы перед сном — relaxing 3D bedtime-игра на Three.js для Яндекс Игр",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "three": "^0.169.0"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0"
+  }
+}

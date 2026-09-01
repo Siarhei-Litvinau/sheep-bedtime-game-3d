@@ -1,0 +1,139 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #0a0a12;
+  touch-action: none;
+}
+
+#app {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+#scene {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+#fade-overlay {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+}
+
+#pause-button {
+  position: absolute;
+  top: max(12px, env(safe-area-inset-top));
+  right: max(12px, env(safe-area-inset-right));
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 16px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 5;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#pause-button:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+#pause-button[hidden] {
+  display: none;
+}
+
+#start-screen {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: radial-gradient(circle at 32% 30%, #3a2a22 0%, #14101f 55%, #07060d 100%);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+#start-screen.hidden {
+  display: none;
+}
+
+.start-card {
+  max-width: 420px;
+  text-align: center;
+  color: #f2e6d8;
+}
+
+.start-card h1 {
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  margin-bottom: 14px;
+}
+
+.start-card p {
+  font-size: 15px;
+  line-height: 1.55;
+  color: #cbb8a6;
+  margin-bottom: 30px;
+}
+
+.start-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.start-btn {
+  min-height: 64px;
+  padding: 12px 24px;
+  border-radius: 16px;
+  border: 1px solid rgba(242, 230, 216, 0.18);
+  background: rgba(242, 185, 138, 0.12);
+  color: #f2e6d8;
+  font: inherit;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  transition: background 0.2s ease, transform 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.start-btn:hover {
+  background: rgba(242, 185, 138, 0.2);
+}
+
+.start-btn:active {
+  transform: scale(0.97);
+}
+
+.start-btn-title {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.start-btn-sub {
+  font-size: 13px;
+  color: #cbb8a6;
+}
