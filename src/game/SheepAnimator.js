@@ -239,6 +239,7 @@ export class SheepAnimator {
     if (this.t >= 1) {
       this.state = 'land';
       this.t = 0;
+      this.callbacks.onLand?.(); // приземление — звук блеяния (audio-download-prompt.md, раздел 3)
     }
   }
 

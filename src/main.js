@@ -20,6 +20,7 @@ import { OwlFirefly } from './world/OwlFirefly.js';
 import { Cat } from './world/Cat.js';
 import { CloudNpc } from './world/CloudNpc.js';
 import { SparkleBurst } from './effects/SparkleBurst.js';
+import { AudioManager } from './audio/AudioManager.js';
 import { notifyGameReady, getPlayerName, showStickyBanner } from './platform/yandex.js';
 
 /**
@@ -30,6 +31,12 @@ import { notifyGameReady, getPlayerName, showStickyBanner } from './platform/yan
 function startGame(sessionDurationMinutes) {
   const canvas = document.getElementById('scene');
   const { renderer, resize } = createRenderer(canvas);
+
+  // Звук (audio-download-prompt.md): startGame() сама вызывается из обработчика
+  // клика по кнопке старта сессии (wireStartScreen → begin()) — это и есть тот
+  // самый пользовательский жест, без которого браузер не разрешит AudioContext.
+  const audio = new AudioManager();
+  audio.unlock();
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x0e0b16);
@@ -135,9 +142,19 @@ function startGame(sessionDurationMinutes) {
       }
     });
   }
-  registerTappable(owl.group, () => owl.onTap());
-  registerTappable(cat.group, () => cat.onTap());
-  registerTappable(cloudNpc.group, () => cloudNpc.onTap());
+  // Звук на тап по NPC (audio-download-prompt.md, раздел 3).
+  registerTappable(owl.group, () => {
+    owl.onTap();
+    audio.play('owlHoot', { volume: 0.7 });
+  });
+  registerTappable(cat.group, () => {
+    cat.onTap();
+    audio.playLooped('catPurr', { volume: 0.55, durationSec: 2.5 });
+  });
+  registerTappable(cloudNpc.group, () => {
+    cloudNpc.onTap();
+    audio.play('tapGentle', { volume: 0.5 });
+  });
 
   const raycaster = new THREE.Raycaster();
   const pointerNDC = new THREE.Vector2();
@@ -201,12 +218,18 @@ function startGame(sessionDurationMinutes) {
   // очередь подтягивается сама.
   const sheepQueue = new SheepQueue(scene, surfacePoint, waypoints, effects, {
     count: sheepCount,
-    onWindowLit: () => barn.lightNextWindow(),
+    onWindowLit: () => {
+      barn.lightNextWindow();
+      // Тише и мягче — переиспользуем tap_soft.mp3 с приглушённой громкостью (раздел 3).
+      audio.play('tapSoft', { volume: 0.3, rate: 0.85 });
+    },
+    onLand: () => audio.play('sheepBleat', { volume: 0.8 }),
     onSessionComplete: () => {
       // Последняя овца ушла спать — облако останавливается над амбаром (раздел 5.4)
       // и сцена сама плавно гаснет (раздел 11, п.11), не дожидаясь игрока.
       cloudNpc.restOverBarn(new THREE.Vector3(barn.group.position.x, 6.0, barn.group.position.z));
       sessionFade.start();
+      audio.fadeOut(6); // раздел 3: "тишина + затухание фоновой музыки"
     },
   });
 
@@ -249,10 +272,18 @@ function startGame(sessionDurationMinutes) {
     npcConsumedPointer = tryTapNpc(event);
     if (!npcConsumedPointer && isNearActiveSheep(event)) {
       sheepQueue.startCharge();
+      audio.play('tapSoft', { volume: 0.8 });
     }
   });
   window.addEventListener('pointerup', () => {
-    if (!npcConsumedPointer) sheepQueue.release();
+    if (!npcConsumedPointer) {
+      // Питч чуть выше исходного тапа — та же audio-download-prompt.md,
+      // раздел 3 ("можно слегка повысить тон программно для разнообразия"),
+      // звук только если реально был заряд (release() иначе no-op, см. её guard).
+      const wasCharging = sheepQueue.animator?.state === 'charge';
+      sheepQueue.release();
+      if (wasCharging) audio.play('tapSoft', { volume: 0.9, rate: 1.3 });
+    }
   });
   window.addEventListener('pointercancel', () => {
     if (!npcConsumedPointer) sheepQueue.release();
@@ -291,6 +322,10 @@ function startGame(sessionDurationMinutes) {
       effects.sparkles.update(dt);
       barn.update(dt);
       colorCurve.update(progress);
+      // sfx-громкость — та же угасающая кривая отклика, что и свечение/искры
+      // (раздел 4); музыка — прогресс сессии, та же кривая яркости (раздел 6).
+      audio.setSfxIntensity(responseIntensityAt(progress));
+      audio.setSessionProgress(progress);
 
       stars.setBreathingCpm(cpm);
       stars.update(dt);
@@ -344,6 +379,7 @@ function startGame(sessionDurationMinutes) {
       renderer,
       camera,
       cameraRig,
+      audio,
       forceRender: () => renderer.render(scene, camera),
     };
   }

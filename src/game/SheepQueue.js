@@ -18,13 +18,14 @@ const JITTER = 0.14;
  * следующая овца становится активной — до полного исчерпания.
  */
 export class SheepQueue {
-  constructor(scene, surfacePoint, waypoints, effects, { count, onWindowLit, onSessionComplete }) {
+  constructor(scene, surfacePoint, waypoints, effects, { count, onWindowLit, onSessionComplete, onLand }) {
     this.scene = scene;
     this.surfacePoint = surfacePoint;
     this.waypoints = waypoints;
     this.effects = effects;
     this.onWindowLit = onWindowLit;
     this.onSessionComplete = onSessionComplete;
+    this.onLand = onLand;
 
     this.pending = [];
     for (let i = 0; i < count; i++) {
@@ -76,6 +77,7 @@ export class SheepQueue {
     this.animator = new SheepAnimator(sheep, this.surfacePoint, this.waypoints, this.effects, {
       onArrive: () => this.onWindowLit?.(),
       onComplete: () => this._retireActive(),
+      onLand: () => this.onLand?.(),
     });
 
     this._layoutWaitingQueue();
